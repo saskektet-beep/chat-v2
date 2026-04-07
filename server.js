@@ -8,10 +8,9 @@ const io = new Server(server, { maxHttpBufferSize: 1e8 });
 const PORT = process.env.PORT || 3000;
 
 app.get("/admin", (req, res) => {
-    res.sendFile(path.join(__dirname, "admin.html"));
+    res.sendfile("admin.html");
 });
 
-// 2. ПОТОМ ВСЁ ОСТАЛЬНОЕ (СТАТИКА)
 app.use(express.static(__dirname));
 
 let queue = [], reports = [], bannedIPs = new Set(), roomsHistory = {};
