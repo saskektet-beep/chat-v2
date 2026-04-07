@@ -1,5 +1,6 @@
 const express = require("express");
 const http = require("http");
+const path = require("path");
 const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
@@ -9,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(__dirname));
 
 app.get("/admin", (req, res) => {
-    res.sendFile(__dirname + "/admin.html");
+    res.sendFile(path.join(__dirname, "admin.html")); // <--- ТЕПЕРЬ ТАК
 });
 
 let queue = [], reports = [], bannedIPs = new Set(), roomsHistory = {};
