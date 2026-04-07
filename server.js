@@ -7,6 +7,7 @@ const io = new Server(server, { maxHttpBufferSize: 1e8 });
 const PORT = process.env.PORT || 3000;
 
 app.use(express.static(__dirname));
+
 app.get("/admin", (req, res) => {
     res.sendFile(__dirname + "/admin.html");
 });
