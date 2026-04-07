@@ -7,10 +7,12 @@ const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 1e8 });
 const PORT = process.env.PORT || 3000;
 
+// Сначала путь для админки
 app.get("/admin", (req, res) => {
-    res.sendfile("admin.html");
+    res.sendFile(path.join(__dirname, "admin.html"));
 });
 
+// Потом статика
 app.use(express.static(__dirname));
 
 let queue = [], reports = [], bannedIPs = new Set(), roomsHistory = {};
