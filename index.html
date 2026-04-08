@@ -5,157 +5,141 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AnonChat Ultimate</title>
     <style>
-        :root { --bg: #18191a; --panel: #242526; --text: #e4e6eb; --my: #0084ff; --their: #3a3b3c; --accent: #2ecc71; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        #online { position: fixed; top: 15px; right: 20px; font-size: 13px; color: var(--accent); font-weight: bold; z-index: 200; background: rgba(0,0,0,0.3); padding: 5px 12px; border-radius: 15px; }
-        #timer { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); color: #f35a5a; font-weight: bold; z-index: 150; background: rgba(0,0,0,0.6); padding: 6px 20px; border-radius: 20px; }
-        #welcome { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; gap: 10px; text-align: center; padding: 20px; overflow-y: auto; }
-        .welcome-input { padding: 10px 15px; border-radius: 20px; border: 1px solid #444; background: #3a3b3c; color: white; width: 260px; outline: none; font-size: 14px; }
-        .btn-main { padding: 15px 45px; font-size: 18px; background: var(--accent); color: white; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; opacity: 0.3; pointer-events: none; transition: 0.3s; margin-top: 10px; }
+        :root { --bg: #18191a; --panel: #242526; --text: #e4e6eb; --my: #0084ff; --their: #3a3b3c; --accent: #2ecc71; --danger: #f35a5a; }
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; height: 100vh; overflow: hidden; }
+        .app-container { width: 100%; max-width: 600px; display: flex; flex-direction: column; height: 100%; position: relative; border-left: 1px solid #333; border-right: 1px solid #333; background: var(--bg); }
+        #online { position: absolute; top: 15px; right: 15px; font-size: 12px; color: var(--accent); z-index: 10; background: rgba(0,0,0,0.4); padding: 4px 10px; border-radius: 10px; }
+        #timer { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); color: var(--danger); font-weight: bold; z-index: 10; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; }
+        #welcome { position: absolute; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; gap: 10px; overflow-y: auto; }
+        .welcome-input { width: 100%; max-width: 300px; padding: 12px; border-radius: 12px; border: 1px solid #444; background: #242526; color: white; outline: none; }
+        .btn-main { width: 100%; max-width: 300px; padding: 15px; font-size: 18px; background: var(--accent); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; opacity: 0.3; pointer-events: none; transition: 0.3s; }
         .btn-main.active { opacity: 1; pointer-events: auto; }
-        #chat-area { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; margin-top: 65px; }
-        .msg { max-width: 85%; padding: 10px 15px; border-radius: 18px; font-size: 15px; word-wrap: break-word; }
+        #chat-area { flex: 1; overflow-y: auto; padding: 70px 15px 20px; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 80%; padding: 10px 14px; border-radius: 18px; font-size: 15px; word-wrap: break-word; line-height: 1.4; cursor: pointer; }
         .my-msg { align-self: flex-end; background: var(--my); border-bottom-right-radius: 4px; }
         .their-msg { align-self: flex-start; background: var(--their); border-bottom-left-radius: 4px; }
-        #input-area { background: var(--panel); padding: 15px; display: flex; gap: 10px; border-top: 1px solid #3e4042; align-items: center; }
-        #voiceBtn { background: #8e44ad; color: white; width: 45px; height: 45px; border: none; border-radius: 50%; cursor: pointer; touch-action: none; }
-        .recording { background: #ff4d4d !important; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        .time { font-size: 10px; opacity: 0.5; display: block; margin-top: 4px; text-align: right; }
+        #input-area { background: var(--panel); padding: 10px; display: flex; gap: 8px; align-items: center; }
+        #m { flex: 1; background: #3a3b3c; border: none; border-radius: 20px; padding: 12px 15px; color: white; outline: none; font-size: 16px; }
+        .action-btn { background: none; border: none; font-size: 20px; cursor: pointer; display: flex; align-items: center; }
+        #rules-box { background: #242526; padding: 15px; border-radius: 12px; font-size: 11px; text-align: left; border: 1px solid #444; width: 100%; max-width: 300px; color: #aaa; line-height: 1.5; }
+        .context-menu { position: fixed; background: #3a3b3c; border-radius: 12px; padding: 5px; display: flex; flex-direction: column; z-index: 1000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        .context-menu button { background: none; border: none; color: white; padding: 10px 20px; text-align: left; cursor: pointer; border-radius: 8px; font-size: 14px; }
+        .context-menu button:hover { background: #4e4f50; }
+        .context-menu .report-btn { color: #f35a5a; font-weight: bold; }
         .hidden { display: none !important; }
-        audio { height: 35px; width: 210px; filter: invert(1); display: block; margin-top: 5px; }
-        #rules-box { background: #242526; padding: 15px; border-radius: 12px; font-size: 11px; text-align: left; border: 1px solid #444; margin-bottom: 10px; max-height: 150px; overflow-y: auto; max-width: 300px; color: #aaa; }
     </style>
 </head>
 <body>
+<div class="app-container">
     <div id="online">Онлайн: <span id="count">0</span></div>
     <div id="timer" class="hidden">30:00</div>
-
     <div id="welcome">
         <h1>AnonChat</h1>
-        <input type="text" id="nickInput" class="welcome-input" placeholder="Ваш ник..." maxlength="15">
-        
-        <div style="font-size:12px; color:#888;">Я: 
-            <select id="myGender" class="welcome-input" style="width:80px;"><option value="M">М</option><option value="F">Ж</option></select>
-            <select id="myAge" class="welcome-input" style="width:100px;"><option value="18-24">18-24</option><option value="24-35">24-35</option><option value="45+">45+</option></select>
+        <input type="text" id="nickInput" class="welcome-input" placeholder="Никнейм..." maxlength="15">
+        <div style="display:flex; gap:10px; width:100%; max-width:300px;">
+            <select id="myGender" class="welcome-input"><option value="M">Я: М</option><option value="F">Я: Ж</option></select>
+            <select id="myAge" class="welcome-input"><option value="18-24">18-24</option><option value="24-35">24-35</option><option value="35+">35+</option></select>
         </div>
-        <div style="font-size:12px; color:#888;">Ищу: 
-            <select id="searchGender" class="welcome-input" style="width:80px;"><option value="ALL">Всех</option><option value="M">М</option><option value="F">Ж</option></select>
-            <select id="searchAge" class="welcome-input" style="width:100px;"><option value="ALL">Любой</option><option value="18-24">18-24</option><option value="24-35">24-35</option><option value="45+">45+</option></select>
+        <div style="display:flex; gap:10px; width:100%; max-width:300px;">
+            <select id="searchGender" class="welcome-input"><option value="ALL">Всех</option><option value="M">Парней</option><option value="F">Девушек</option></select>
+            <select id="searchAge" class="welcome-input"><option value="ALL">Любой возраст</option><option value="18-24">18-24</option><option value="24-35">24-35</option></select>
         </div>
-
-        <div id="rules-box" class="hidden">
+        <div id="rules-box">
             <b>ПРАВИЛА (18+):</b><br>
-            1. Запрещены любые проявления ненависти.<br>
-            2. Запрещен мат и оскорбления пары.<br>
-            3. Запрещена реклама и спам-рассылки.<br>
-            4. Запрещена трансляция шок-контента.<br>
-            5. Запрещено любое мошенничество.<br>
-            6. Админ не несет ответственности за переписку.<br>
-            7. Все чаты анонимны, история удаляется сразу.<br>
-            8. Не передавайте свои личные данные.<br>
-            9. Бан по IP за серьезные нарушения.<br>
-            10. Нажимая «Начать», вам есть 18 лет.
+            1. Запрещена любая ненависть.<br>
+            2. Запрещен мат.<br>
+            3. Запрещена реклама.<br>
+            4. Запрещен шок-контент.<br>
+            5. Запрещено мошенничество.<br>
+            6. Админ не несет ответственности.<br>
+            7. Чаты анонимны.<br>
+            8. Не давайте личные данные.<br>
+            9. Бан по IP за нарушения.<br>
+            10. Нажимая, вам есть 18 лет.
         </div>
-        <div style="font-size: 13px; color: #888;">
-            <input type="checkbox" id="agree"> Принимаю <a href="javascript:void(0)" onclick="document.getElementById('rules-box').classList.toggle('hidden')" style="color:var(--my)">правила</a>
-        </div>
-        <button class="btn-main" id="startBtn">Найти пару</button>
-        <p id="wait" class="hidden">Ищем собеседника...</p>
+        <label style="font-size: 13px; color: #888; cursor:pointer;"><input type="checkbox" id="agree"> Принимаю правила</label>
+        <button class="btn-main" id="startBtn">Найти собеседника</button>
+        <p id="wait" class="hidden">Поиск...</p>
     </div>
-
     <div id="chat-area"></div>
     <div id="input-area" class="hidden">
-        <button style="background: #e67e22; border:none; border-radius:10px; padding:10px; cursor:pointer;" onclick="if(confirm('Жалоба?')){socket.emit('sendReport');alert('Отправлено')}">🚩</button>
-        <button style="background:#f35a5a; color:white; border:none; border-radius:10px; padding:10px; cursor:pointer;" onclick="socket.emit('endChat')">След.</button>
-        <button id="voiceBtn">🎤</button>
-        <input type="text" id="m" style="flex:1; background:#3a3b3c; border:none; border-radius:20px; padding:12px; color:white; outline:none;" placeholder="Текст...">
-        <button id="sendBtn" style="background:#0084ff; color:white; border:none; border-radius:20px; padding:10px 20px; cursor:pointer;">📤</button>
+        <button class="action-btn" onclick="if(confirm('Сменить?')) socket.emit('endChat')" style="color:var(--danger)">⏭️</button>
+        <input type="text" id="m" placeholder="Текст..." autocomplete="off">
+        <button id="sendBtn" class="action-btn" style="color:var(--my); font-weight:bold; font-size:14px;">ОТПРАВИТЬ</button>
     </div>
+</div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-        const chat = document.getElementById('chat-area'), input = document.getElementById('m'), startBtn = document.getElementById('startBtn'), nickInput = document.getElementById('nickInput');
-        const joinSound = new Audio('https://mixkit.co');
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    if (!localStorage.getItem('permanentId')) { localStorage.setItem('permanentId', 'id-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now().toString(36)); }
+    const myId = localStorage.getItem('permanentId');
+    const socket = io();
+    const chat = document.getElementById('chat-area'), input = document.getElementById('m'), startBtn = document.getElementById('startBtn'), nickInput = document.getElementById('nickInput');
+    
+    const validate = () => { if(nickInput.value.trim().length >= 2 && document.getElementById('agree').checked) startBtn.classList.add('active'); else startBtn.classList.remove('active'); };
+    nickInput.oninput = validate; document.getElementById('agree').onchange = validate;
+    
+    startBtn.onclick = () => { socket.emit('startSearch', { permanentId: myId, nickname: nickInput.value.trim(), myGender: document.getElementById('myGender').value, myAge: document.getElementById('myAge').value, searchGender: document.getElementById('searchGender').value, searchAge: document.getElementById('searchAge').value }); startBtn.classList.add('hidden'); document.getElementById('wait').classList.remove('hidden'); };
+    
+    let tId;
+    socket.on('chatStart', (d) => { 
+        document.getElementById('welcome').classList.add('hidden'); 
+        document.getElementById('input-area').classList.remove('hidden'); 
+        document.getElementById('timer').classList.remove('hidden'); 
+        chat.innerHTML = `<div style="text-align:center; color:#888; font-size:12px;">Вы с собеседником ${d.partnerNick}</div>`; 
+        let sec = 1800; clearInterval(tId); 
+        tId = setInterval(() => { 
+            sec--; let m = Math.floor(sec/60), s = sec%60; 
+            document.getElementById('timer').innerText = `${m}:${s < 10 ? '0' : ''}${s}`; 
+            if(sec <= 0) socket.emit('endChat'); 
+        }, 1000); 
+    });
+    
+    socket.on('chatEnd', () => { 
+        clearInterval(tId); 
+        document.getElementById('timer').classList.add('hidden'); 
+        document.getElementById('input-area').classList.add('hidden'); 
+        document.getElementById('welcome').classList.remove('hidden'); 
+        document.getElementById('wait').classList.add('hidden'); 
+        startBtn.classList.remove('hidden'); 
+    });
 
-        // Валидация
-        const validate = () => {
-            if(nickInput.value.trim().length >= 2 && document.getElementById('agree').checked) startBtn.classList.add('active');
-            else startBtn.classList.remove('active');
-        };
-        nickInput.oninput = validate; document.getElementById('agree').onchange = validate;
+    const appendMsg = (d, type) => { 
+        const div = document.createElement('div'); 
+        div.className = `msg ${type}`; 
+        div.innerHTML = `<b>${d.nick}</b><br>${d.text}<span class="time">${d.time}</span>`; 
+        div.onclick = (e) => showMenu(e, d.nick); 
+        chat.appendChild(div); 
+        chat.scrollTop = chat.scrollHeight; 
+    };
 
-        startBtn.onclick = () => {
-            socket.emit('startSearch', { 
-                nickname: nickInput.value.trim(),
-                myGender: document.getElementById('myGender').value,
-                myAge: document.getElementById('myAge').value,
-                searchGender: document.getElementById('searchGender').value,
-                searchAge: document.getElementById('searchAge').value
-            });
-            startBtn.classList.add('hidden'); document.getElementById('wait').classList.remove('hidden');
-        };
+    document.getElementById('sendBtn').onclick = () => { 
+        if(input.value.trim()){ 
+            socket.emit('message', input.value); 
+            input.value = ''; 
+        } 
+    };
 
-        let timerId;
-        socket.on('chatStart', (d) => {
-            joinSound.play().catch(()=>{});
-            document.getElementById('welcome').classList.add('hidden');
-            document.getElementById('input-area').classList.remove('hidden');
-            document.getElementById('timer').classList.remove('hidden');
-            chat.innerHTML = `<div style="text-align:center; color:#888;">Пара найдена: ${d.partnerNick}</div>`;
-            let timeLeft = 1800;
-            clearInterval(timerId);
-            timerId = setInterval(() => {
-                timeLeft--; let m = Math.floor(timeLeft/60), s = timeLeft%60;
-                document.getElementById('timer').innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
-                if(timeLeft <= 0) socket.emit('endChat');
-            }, 1000);
-        });
+    input.onkeypress = (e) => { if(e.key === 'Enter') document.getElementById('sendBtn').click(); };
 
-        // ТВОЙ ОРИГИНАЛЬНЫЙ КОД МИКРОФОНА
-        let mediaRecorder, chunks = [];
-        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-            mediaRecorder = new MediaRecorder(stream);
-            mediaRecorder.ondataavailable = e => chunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'audio/webm' });
-                const reader = new FileReader();
-                reader.readAsDataURL(blob); 
-                reader.onloadend = () => {
-                    if(reader.result.length > 500) socket.emit('audioMessage', reader.result);
-                };
-                chunks = [];
-            };
-        });
+    socket.on('message', (d) => appendMsg(d, d.id === myId ? 'my-msg' : 'their-msg'));
+    socket.on('updateOnline', (c) => document.getElementById('count').innerText = c);
 
-        const vBtn = document.getElementById('voiceBtn');
-        vBtn.onmousedown = () => { if(mediaRecorder) { chunks = []; vBtn.classList.add('recording'); mediaRecorder.start(); } };
-        vBtn.onmouseup = () => { if(mediaRecorder) { vBtn.classList.remove('recording'); mediaRecorder.stop(); } };
-        vBtn.ontouchstart = (e) => { e.preventDefault(); chunks = []; vBtn.classList.add('recording'); mediaRecorder.start(); };
-        vBtn.ontouchend = () => { vBtn.classList.remove('recording'); mediaRecorder.stop(); };
+    function showMenu(e, nick) { 
+        const old = document.querySelector('.context-menu'); if(old) old.remove(); 
+        const m = document.createElement('div'); 
+        m.className = 'context-menu'; 
+        m.style.top = `${e.clientY}px`; 
+        m.style.left = `${e.clientX}px`; 
+        m.innerHTML = `<button onclick="reply('${nick}')">Ответить</button><button class="report-btn" onclick="rep()">Жалоба</button><button onclick="this.parentElement.remove()">Отмена</button>`; 
+        document.body.appendChild(m); 
+        setTimeout(() => { window.onclick = () => { if(m) m.remove(); window.onclick = null; } }, 100); 
+    }
 
-        // Отрисовка
-        function append(d, isAudio) {
-            const div = document.createElement('div');
-            div.className = `msg ${d.id === socket.id ? 'my-msg' : 'their-msg'}`;
-            const header = `<small style="font-size:10px; opacity:0.6">${d.nick} • ${d.time}</small>`;
-            if(isAudio) {
-                const au = document.createElement('audio'); au.controls = true; au.src = d.audio;
-                div.innerHTML = header + "<br>"; div.appendChild(au);
-                au.onloadeddata = () => { chat.scrollTop = chat.scrollHeight; };
-            } else { div.innerHTML = `${header}<br>${d.text}`; }
-            chat.appendChild(div); chat.scrollTop = chat.scrollHeight;
-        }
-
-        socket.on('message', d => append(d, false));
-        socket.on('audioMessage', d => append(d, true));
-
-        socket.on('updateOnline', c => document.getElementById('count').innerText = c);
-        socket.on('chatEnd', () => location.reload());
-        socket.on('banned_user', () => document.body.innerHTML = "<h1 style='color:white;text-align:center;margin-top:100px;'>ВЫ ЗАБАНЕНЫ</h1>");
-
-        document.getElementById('sendBtn').onclick = () => { if(input.value.trim()){ socket.emit('message', input.value); input.value=''; } };
-        input.onkeypress = (e) => { if(e.key === 'Enter') document.getElementById('sendBtn').click(); };
-    </script>
+    window.reply = (n) => { input.value = `${n}, `; input.focus(); };
+    window.rep = () => { if(confirm('Отправить жалобу?')){ socket.emit('sendReport'); alert('Жалоба отправлена'); } };
+</script>
 </body>
 </html>
