@@ -4,28 +4,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AnonChat Ultimate</title>
-    <style>
-        :root { --bg: #18191a; --panel: #242526; --text: #e4e6eb; --my: #0084ff; --their: #3a3b3c; --accent: #2ecc71; --danger: #f35a5a; }
-        * { box-sizing: border-box; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; height: 100vh; overflow: hidden; }
-        .app-container { width: 100%; max-width: 600px; display: flex; flex-direction: column; height: 100%; position: relative; border-left: 1px solid #333; border-right: 1px solid #333; background: var(--bg); }
-        #online { position: absolute; top: 15px; right: 15px; font-size: 12px; color: var(--accent); z-index: 10; background: rgba(0,0,0,0.4); padding: 4px 10px; border-radius: 10px; }
-        #timer { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); color: var(--danger); font-weight: bold; z-index: 10; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; }
-        #welcome { position: absolute; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; gap: 10px; overflow-y: auto; }
-        .welcome-input { width: 100%; max-width: 300px; padding: 12px; border-radius: 12px; border: 1px solid #444; background: #242526; color: white; outline: none; }
-        .btn-main { width: 100%; max-width: 300px; padding: 15px; font-size: 18px; background: var(--accent); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; opacity: 0.3; pointer-events: none; transition: 0.3s; }
-        .btn-main.active { opacity: 1; pointer-events: auto; }
-        #chat-area { flex: 1; overflow-y: auto; padding: 70px 15px 20px; display: flex; flex-direction: column; gap: 10px; }
-        .msg { max-width: 80%; padding: 10px 14px; border-radius: 18px; font-size: 15px; word-wrap: break-word; line-height: 1.4; cursor: pointer; position: relative; }
-        .my-msg { align-self: flex-end; background: var(--my); border-bottom-right-radius: 4px; }
-        .their-msg { align-self: flex-start; background: var(--their); border-bottom-left-radius: 4px; }
-        .time { font-size: 10px; opacity: 0.5; display: block; margin-top: 4px; text-align: right; }
-        #input-area { background: var(--panel); padding: 10px; display: flex; gap: 8px; align-items: center; }
-        #m { flex: 1; background: #3a3b3c; border: none; border-radius: 20px; padding: 12px 15px; color: white; outline: none; font-size: 16px; }
-        .action-btn { background: none; border: none; font-size: 20px; cursor: pointer; display: flex; align-items: center; }
-        #rules-box { background: #242526; padding: 15px; border-radius: 12px; font-size: 11px; text-align: left; border: 1px solid #444; width: 100%; max-width: 300px; color: #aaa; line-height: 1.5; }
-        .hidden { display: none !important; }
-    </style>
+      <style>
+    :root { --bg: #18191a; --panel: #242526; --text: #e4e6eb; --my: #0084ff; --their: #3a3b3c; --accent: #2ecc71; --danger: #f35a5a; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; height: 100vh; overflow: hidden; }
+    .app-container { width: 100%; max-width: 600px; display: flex; flex-direction: column; height: 100%; position: relative; border-left: 1px solid #333; border-right: 1px solid #333; background: var(--bg); }
+    #online { position: absolute; top: 15px; right: 15px; font-size: 12px; color: var(--accent); z-index: 10; background: rgba(0,0,0,0.4); padding: 4px 10px; border-radius: 10px; }
+    #timer { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); color: var(--danger); font-weight: bold; z-index: 10; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; }
+    #welcome { position: absolute; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; gap: 10px; overflow-y: auto; }
+    .welcome-input { width: 100%; max-width: 300px; padding: 12px; border-radius: 12px; border: 1px solid #444; background: #242526; color: white; outline: none; }
+    .btn-main { width: 100%; max-width: 300px; padding: 15px; font-size: 18px; background: var(--accent); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; opacity: 0.3; pointer-events: none; transition: 0.3s; }
+    .btn-main.active { opacity: 1; pointer-events: auto; }
+    #chat-area { flex: 1; overflow-y: auto; padding: 70px 15px 20px; display: flex; flex-direction: column; gap: 10px; }
+    .msg { max-width: 80%; padding: 10px 14px; border-radius: 18px; font-size: 15px; word-wrap: break-word; line-height: 1.4; cursor: pointer; position: relative; }
+    .my-msg { align-self: flex-end; background: var(--my); border-bottom-right-radius: 4px; }
+    .their-msg { align-self: flex-start; background: var(--their); border-bottom-left-radius: 4px; }
+    .time { font-size: 10px; opacity: 0.5; display: block; margin-top: 4px; text-align: right; }
+    #input-area { background: var(--panel); padding: 10px; display: flex; gap: 8px; align-items: center; }
+    #m { flex: 1; background: #3a3b3c; border: none; border-radius: 20px; padding: 12px 15px; color: white; outline: none; font-size: 16px; }
+    .action-btn { background: none; border: none; font-size: 20px; cursor: pointer; display: flex; align-items: center; }
+    #rules-box { background: #242526; padding: 15px; border-radius: 12px; font-size: 11px; text-align: left; border: 1px solid #444; width: 100%; max-width: 300px; color: #aaa; line-height: 1.5; }
+    .hidden { display: none !important; }
+
+    /* ДОБАВЬ ВОТ ЭТО В САМЫЙ КОНЕЦ ПЕРЕД </STYLE> */
+    #wait::after {
+        content: "";
+        animation: dots 1.5s infinite;
+    }
+    @keyframes dots {
+        0% { content: ""; }
+        33% { content: "."; }
+        66% { content: ".."; }
+        100% { content: "..."; }
+    }
+        </style>
 </head>
 <body>
 <div class="app-container">
@@ -92,22 +104,47 @@
     nickInput.oninput = validate; 
     document.getElementById('agree').onchange = validate;
 
-    startBtn.onclick = () => { 
-        socket.emit('startSearch', { 
-            permanentId: myId, 
-            nickname: nickInput.value.trim(), 
-            myGender: document.getElementById('myGender').value, 
-            myAge: document.getElementById('myAge').value, 
-            searchGender: document.getElementById('searchGender').value, 
-            searchAge: document.getElementById('searchAge').value 
-        }); 
+     // 1. Создаем единую функцию поиска с задержкой 3 сек
+    function startSearchWithDelay() {
         startBtn.classList.add('hidden'); 
         document.getElementById('wait').classList.remove('hidden'); 
+        
+        // Сама задержка
+        setTimeout(() => {
+            socket.emit('startSearch', { 
+                permanentId: myId, 
+                nickname: nickInput.value.trim(), 
+                myGender: document.getElementById('myGender').value, 
+                myAge: document.getElementById('myAge').value, 
+                searchGender: document.getElementById('searchGender').value, 
+                searchAge: document.getElementById('searchAge').value 
+            });
+        }, 3000); // 3000 мс = 3 секунды
+    }
+
+    // 2. Кнопка "Начать поиск" теперь просто вызывает эту функцию
+    startBtn.onclick = () => { 
+        startSearchWithDelay();
     };
 
+    // 3. Кнопка "Следующий" вызывает возврат в меню и авто-поиск
     leaveBtn.onclick = () => {
-        if(confirm('Сменить собеседника?')) socket.emit('endChat');
+        if(confirm('Сменить собеседника?')) {
+            socket.emit('endChat');
+            backToMenu(); // Возвращаем интерфейс к начальному виду
+            startSearchWithDelay(); // Запускаем поиск автоматически
+        }
     };
+
+    // 4. Не забудь саму функцию возврата в меню (если её еще нет)
+    function backToMenu() {
+        document.getElementById('input-area').classList.add('hidden'); 
+        document.getElementById('timer').classList.add('hidden'); 
+        document.getElementById('welcome').classList.remove('hidden'); 
+        startBtn.classList.remove('hidden'); 
+        document.getElementById('wait').classList.add('hidden');
+        clearInterval(tId);
+    }
 
     const sendMessage = () => {
         if(input.value.trim()) {
@@ -120,6 +157,7 @@
     input.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
 
     let tId;
+     // Когда чат начался
     socket.on('chatStart', (d) => { 
         document.getElementById('welcome').classList.add('hidden'); 
         document.getElementById('input-area').classList.remove('hidden'); 
@@ -136,13 +174,21 @@
         }, 1000); 
     });
 
+    // Когда собеседник ушел (ТВОЙ ИСПРАВЛЕННЫЙ БЛОК)
     socket.on('chatEnd', () => { 
-        clearInterval(tId); 
-        document.getElementById('timer').classList.add('hidden'); 
-        document.getElementById('input-area').classList.add('hidden'); 
-        document.getElementById('welcome').classList.remove('hidden'); 
-        document.getElementById('wait').classList.add('hidden'); 
-        startBtn.classList.remove('hidden'); 
+        alert("Собеседник покинул чат");
+        backToMenu(); 
+    });
+
+    // Получение сообщений
+    socket.on('message', (d) => {
+        const type = d.id === myId ? 'my-msg' : 'their-msg';
+        const div = document.createElement('div'); 
+        div.className = `msg ${type}`; 
+        div.innerHTML = `<b>${d.nick}</b><br>${d.text}<span class="time">${d.time}</span>`;
+        if (type === 'their-msg') div.onclick = () => { if(confirm('Жалоба?')) socket.emit('sendReport'); };
+        chat.appendChild(div); 
+        chat.scrollTop = chat.scrollHeight; 
     });
 
     const appendMsg = (d, type) => { 
