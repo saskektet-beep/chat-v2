@@ -157,7 +157,8 @@
     input.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
 
     let tId;
-     // Когда чат начался
+
+    // 1. Когда чат начался
     socket.on('chatStart', (d) => { 
         document.getElementById('welcome').classList.add('hidden'); 
         document.getElementById('input-area').classList.remove('hidden'); 
@@ -174,23 +175,13 @@
         }, 1000); 
     });
 
-    // Когда собеседник ушел (ТВОЙ ИСПРАВЛЕННЫЙ БЛОК)
+    // 2. Когда собеседник ушел
     socket.on('chatEnd', () => { 
         alert("Собеседник покинул чат");
         backToMenu(); 
     });
 
-    // Получение сообщений
-    socket.on('message', (d) => {
-        const type = d.id === myId ? 'my-msg' : 'their-msg';
-        const div = document.createElement('div'); 
-        div.className = `msg ${type}`; 
-        div.innerHTML = `<b>${d.nick}</b><br>${d.text}<span class="time">${d.time}</span>`;
-        if (type === 'their-msg') div.onclick = () => { if(confirm('Жалоба?')) socket.emit('sendReport'); };
-        chat.appendChild(div); 
-        chat.scrollTop = chat.scrollHeight; 
-    });
-
+    // 3. Функция для отрисовки сообщений
     const appendMsg = (d, type) => { 
         const div = document.createElement('div'); 
         div.className = `msg ${type}`; 
@@ -209,11 +200,13 @@
         chat.scrollTop = chat.scrollHeight; 
     };
 
+    // 4. Получение сообщения (теперь только один раз!)
     socket.on('message', (d) => {
         const type = d.id === myId ? 'my-msg' : 'their-msg';
         appendMsg(d, type);
     });
 
+    // 5. Прочие события
     socket.on('updateOnline', (count) => {
         document.getElementById('count').innerText = count;
     });
@@ -221,6 +214,11 @@
     socket.on('banned_user', () => {
         alert('Вы были заблокированы.');
         window.location.reload();
+    });
+    
+    socket.on('waiting', () => { 
+        startBtn.classList.add('hidden'); 
+        document.getElementById('wait').classList.remove('hidden'); 
     });
 </script>
 </body>
