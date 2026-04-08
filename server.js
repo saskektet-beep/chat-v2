@@ -10,11 +10,9 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 const PORT = process.env.PORT || 10000;
 
-// Настройка путей (используем resolve для Render)
 const publicPath = path.resolve(__dirname, "public");
 app.use(express.static(publicPath));
 
-// Маршруты для страниц
 app.get('/', (req, res) => {
     res.sendFile(path.join(publicPath, 'index.html'));
 });
@@ -23,7 +21,6 @@ app.get('/admin', (req, res) => {
     res.sendFile(path.join(publicPath, 'admin.html'));
 });
 
-// Логика чата
 let queue = [], reports = [], roomsHistory = new Map();
 const ADMIN_PASSWORD = "Cfifcfif"; 
 
@@ -56,9 +53,18 @@ function terminateChat(socket) {
     }
 }
 
+function getIP(socket) {
+    return socket.handshake.headers['x-forwarded-for'] ? socket.handshake.headers['x-forwarded-for'].split(',')[0] : socket.handshake.address;
+}
+
 io.on("connection", (socket) => {
-    const userIP = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-    if (bannedIPs.has(userIP)) { socket.emit("banned_user"); socket.disconnect(); return; }
+    const userIP = getIP(socket);
+    
+    if (bannedIPs.has(userIP)) { 
+        socket.emit("banned_user"); 
+        socket.disconnect(true); 
+        return; 
+    }
     
     io.emit("updateOnline", io.engine.clientsCount);
 
@@ -107,26 +113,44 @@ io.on("connection", (socket) => {
 
     socket.on("sendReport", () => {
         if (socket.room && roomsHistory.has(socket.room)) {
-            reports.push({ id: Date.now(), reporterNick: socket.username, targetIP: userIP, time: new Date().toLocaleString(), chatLog: JSON.parse(JSON.stringify(roomsHistory.get(socket.room))) });
+            // Берем IP того, КТО вызвал жалобу (в чат-логе есть IP обоих)
+            reports.push({ 
+                id: Date.now(), 
+                reporterNick: socket.username, 
+                targetIP: userIP, 
+                time: new Date().toLocaleString(), 
+                chatLog: JSON.parse(JSON.stringify(roomsHistory.get(socket.room))) 
+            });
             io.emit("admin_update", { reports, banned: [...bannedIPs] });
         }
     });
 
-    socket.on("admin_login", (p) => { if(p === ADMIN_PASSWORD) { socket.isAdmin = true; socket.emit("admin_access", { reports, banned: [...bannedIPs] }); } });
+    socket.on("admin_login", (p) => { 
+        if(p === ADMIN_PASSWORD) { 
+            socket.isAdmin = true; 
+            socket.emit("admin_access", { reports, banned: [...bannedIPs] }); 
+        } 
+    });
     
     socket.on("admin_ban_target", (ip) => {
         if (!socket.isAdmin) return;
-        bannedIPs.add(ip); saveBans();
+        bannedIPs.add(ip); 
+        saveBans();
+        
+        // Жесткий разрыв соединений всех сокетов с этим IP
         io.sockets.sockets.forEach(s => { 
-            const sIP = s.handshake.headers['x-forwarded-for'] || s.handshake.address;
-            if(sIP === ip){ s.emit("banned_user"); s.disconnect(); }
+            if(getIP(s) === ip){ 
+                s.emit("banned_user"); 
+                s.disconnect(true); 
+            }
         });
         io.emit("admin_update", { reports, banned: [...bannedIPs] });
     });
 
     socket.on("admin_unban", (ip) => {
         if (!socket.isAdmin) return;
-        bannedIPs.delete(ip); saveBans();
+        bannedIPs.delete(ip); 
+        saveBans();
         io.emit("admin_update", { reports, banned: [...bannedIPs] });
     });
 
@@ -137,7 +161,11 @@ io.on("connection", (socket) => {
     });
 
     socket.on("endChat", () => terminateChat(socket));
-    socket.on("disconnect", () => { terminateChat(socket); queue = queue.filter(u => u.id !== socket.id); io.emit("updateOnline", io.engine.clientsCount); });
+    socket.on("disconnect", () => { 
+        terminateChat(socket); 
+        queue = queue.filter(u => u.id !== socket.id); 
+        io.emit("updateOnline", io.engine.clientsCount); 
+    });
 });
 
 server.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`));
