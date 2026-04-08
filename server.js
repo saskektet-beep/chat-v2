@@ -1,93 +1,163 @@
 const express = require("express");
 const http = require("http");
 const path = require("path");
+const fs = require("fs"); // Для сохранения банов
+const crypto = require("crypto");
 const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { maxHttpBufferSize: 1e8 });
+const io = new Server(server, { maxHttpBufferSize: 1e8, cors: { origin: "*" } });
+
+// Глобальный порт
 const PORT = process.env.PORT || 3000;
 
-// Сначала путь для админки
+// 1. ПУТИ (сохранил как в твоем старом сайте)
 app.get("/admin", (req, res) => {
     res.sendFile(path.join(__dirname, "admin.html"));
 });
-
-// Потом статика
 app.use(express.static(__dirname));
 
-let queue = [], reports = [], bannedIPs = new Set(), roomsHistory = {};
+// 2. ДАННЫЕ
+let queue = [], reports = [], roomsHistory = new Map();
 const ADMIN_PASSWORD = "Cfifcfif"; 
+
+// 3. ЗАГРУЗКА БАНОВ ИЗ ФАЙЛА
+let bannedIPs = new Set();
+if (fs.existsSync("bans.json")) {
+    try {
+        bannedIPs = new Set(JSON.parse(fs.readFileSync("bans.json")));
+    } catch (e) { console.log("Ошибка чтения bans.json"); }
+}
+const saveBans = () => fs.writeFileSync("bans.json", JSON.stringify([...bannedIPs]));
+
+// 4. ЗАЩИТА ОТ XSS (исправленная строка 27)
+const escapeHTML = (str) => {
+    if (typeof str !== 'string') return '';
+    return str.replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+};
 
 function terminateChat(socket) {
     if (socket.room) {
         io.to(socket.room).emit("chatEnd");
-        delete roomsHistory[socket.room];
+        roomsHistory.delete(socket.room);
         socket.room = null;
     }
 }
 
 io.on("connection", (socket) => {
     const userIP = socket.handshake.address;
-    if (bannedIPs.has(userIP)) { socket.emit("banned_user"); socket.disconnect(); return; }
+    
+    // Проверка бана
+    if (bannedIPs.has(userIP)) { 
+        socket.emit("banned_user"); 
+        socket.disconnect(); 
+        return; 
+    }
+    
     io.emit("updateOnline", io.engine.clientsCount);
 
     socket.on("startSearch", (data) => {
-        socket.username = data.nickname || "Аноним";
-        socket.myGender = data.myGender; socket.myAge = data.myAge;
-        socket.searchGender = data.searchGender; socket.searchAge = data.searchAge;
+        terminateChat(socket);
+        queue = queue.filter(s => s.id !== socket.id);
 
-        const partnerIndex = queue.findIndex(p => {
+        // Привязываем вечный ID к сокету
+        socket.permanentId = data.permanentId || "unknown";
+        socket.username = escapeHTML(data.nickname) || "Аноним";
+        socket.myGender = data.myGender || 'ALL';
+        socket.myAge = data.myAge || 'ALL';
+        socket.searchGender = data.searchGender || 'ALL';
+        socket.searchAge = data.searchAge || 'ALL';
+
+        const pIndex = queue.findIndex(p => {
             const gOk = (socket.searchGender === 'ALL' || socket.searchGender === p.myGender) && (p.searchGender === 'ALL' || p.searchGender === socket.myGender);
             const aOk = (socket.searchAge === 'ALL' || socket.searchAge === p.myAge) && (p.searchAge === 'ALL' || p.searchAge === socket.myAge);
             return gOk && aOk;
         });
 
-        if (partnerIndex !== -1) {
-            const partner = queue.splice(partnerIndex, 1)[0];
+        if (pIndex !== -1) {
+            const partner = queue.splice(pIndex, 1)[0];
             const room = `room_${socket.id}_${partner.id}`;
-            socket.join(room); partner.join(room);
-            socket.room = room; partner.room = room;
-            roomsHistory[room] = [];
-            io.to(room).emit("chatStart", { myNick: socket.username, partnerNick: partner.username });
-        } else { queue.push(socket); socket.emit("waiting"); }
+            
+            socket.join(room);
+            partner.join(room);
+            socket.room = room;
+            partner.room = room;
+
+            roomsHistory.set(room, []);
+
+            // Отправляем ники правильно
+            socket.emit("chatStart", { partnerNick: partner.username });
+            partner.emit("chatStart", { partnerNick: socket.username });
+        } else {
+            queue.push(socket);
+            socket.emit("waiting");
+        }
     });
 
     socket.on("message", (msg) => {
-        if (socket.room) {
-            const d = { id: socket.id, nick: socket.username, ip: userIP, text: msg, time: new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) };
-            if(roomsHistory[socket.room]) roomsHistory[socket.room].push(d);
+        if (socket.room && msg?.trim()) {
+            const d = { 
+                id: socket.permanentId, 
+                nick: socket.username, 
+                ip: userIP, 
+                text: escapeHTML(msg).substring(0, 1000), 
+                time: new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) 
+            };
+            if(roomsHistory.has(socket.room)) roomsHistory.get(socket.room).push(d);
             io.to(socket.room).emit("message", d);
         }
     });
 
-    socket.on("audioMessage", (audio) => {
-        if (socket.room) {
-            const d = { id: socket.id, nick: socket.username, ip: userIP, audio: audio, time: new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) };
-            if(roomsHistory[socket.room]) roomsHistory[socket.room].push(d);
-            io.to(socket.room).emit("audioMessage", d);
-        }
-    });
-
     socket.on("sendReport", () => {
-        if (socket.room) {
-            reports.push({ id: Date.now(), reporterNick: socket.username, time: new Date().toLocaleString(), chatLog: [...(roomsHistory[socket.room] || [])] });
-            io.emit("admin_update", { reports, banned: Array.from(bannedIPs) });
+        if (socket.room && roomsHistory.has(socket.room)) {
+            reports.push({ 
+                id: Date.now(), 
+                reporterNick: socket.username, 
+                reporterId: socket.permanentId, 
+                targetIP: userIP, 
+                time: new Date().toLocaleString(), 
+                chatLog: JSON.parse(JSON.stringify(roomsHistory.get(socket.room))) 
+            });
+            io.emit("admin_update", { reports, banned: [...bannedIPs] });
         }
     });
 
-    socket.on("admin_login", (p) => { if(p === ADMIN_PASSWORD) socket.emit("admin_access", { reports, banned: Array.from(bannedIPs) }); });
-    socket.on("admin_ban_target", (ip) => {
-        bannedIPs.add(ip);
-        io.sockets.sockets.forEach(s => { if(s.handshake.address === ip){ s.emit("banned_user"); s.disconnect(); }});
-        io.emit("admin_update", { reports, banned: Array.from(bannedIPs) });
+    socket.on("admin_login", (p) => { 
+        if(p === ADMIN_PASSWORD) {
+            socket.isAdmin = true;
+            socket.emit("admin_access", { reports, banned: [...bannedIPs] }); 
+        }
     });
-    socket.on("admin_unban", (ip) => { bannedIPs.delete(ip); io.emit("admin_update", { reports, banned: Array.from(bannedIPs) }); });
-    socket.on("admin_close_report", (id) => { reports = reports.filter(r => r.id !== id); io.emit("admin_update", { reports, banned: Array.from(bannedIPs) }); });
+
+    socket.on("admin_ban_target", (ip) => {
+        if (!socket.isAdmin) return;
+        bannedIPs.add(ip);
+        saveBans();
+        io.sockets.sockets.forEach(s => { if(s.handshake.address === ip){ s.emit("banned_user"); s.disconnect(); }});
+        io.emit("admin_update", { reports, banned: [...bannedIPs] });
+    });
+
+    socket.on("admin_unban", (ip) => {
+        if (!socket.isAdmin) return;
+        bannedIPs.delete(ip);
+        saveBans();
+        io.emit("admin_update", { reports, banned: [...bannedIPs] });
+    });
+
+    socket.on("admin_close_report", (id) => {
+        if (!socket.isAdmin) return;
+        reports = reports.filter(r => r.id !== id);
+        io.emit("admin_update", { reports, banned: [...bannedIPs] });
+    });
     
     socket.on("endChat", () => terminateChat(socket));
-    socket.on("disconnect", () => { terminateChat(socket); queue = queue.filter(u => u.id !== socket.id); io.emit("updateOnline", io.engine.clientsCount); });
+    socket.on("disconnect", () => { 
+        terminateChat(socket); 
+        queue = queue.filter(u => u.id !== socket.id); 
+        io.emit("updateOnline", io.engine.clientsCount); 
+    });
 });
 
-server.listen(PORT, () => {
-    console.log(`Сервер запущен на порту ${PORT}`);
-});
+// ГЛОБАЛЬНЫЙ ЗАПУСК (0.0.0.0 для внешнего доступа)
+server.listen(PORT, "0.0.0.0", () => {
+    console.log(`Сервер запущен глобально: порт ${PORT}`);
