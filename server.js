@@ -8,10 +8,10 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
-// Настройка путей
-const publicPath = path.join(__dirname, "public");
+// Настройка путей (используем resolve для Render)
+const publicPath = path.resolve(__dirname, "public");
 app.use(express.static(publicPath));
 
 // Маршруты для страниц
@@ -39,7 +39,13 @@ const saveBans = () => fs.writeFileSync("bans.json", JSON.stringify([...bannedIP
 
 const escapeHTML = (str) => {
     if (typeof str !== 'string') return '';
-    return str.replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    return str.replace(/[&<>"']/g, (m) => ({ 
+        '&': '&amp;', 
+        '<': '&lt;', 
+        '>': '&gt;', 
+        '"': '&quot;', 
+        "'": '&#39;' 
+    })[m]);
 };
 
 function terminateChat(socket) {
@@ -88,7 +94,12 @@ io.on("connection", (socket) => {
 
     socket.on("message", (msg) => {
         if (socket.room && msg?.trim()) {
-            const d = { id: socket.permanentId, nick: socket.username, text: escapeHTML(msg).substring(0, 1000), time: new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) };
+            const d = { 
+                id: socket.permanentId, 
+                nick: socket.username, 
+                text: escapeHTML(msg).substring(0, 1000), 
+                time: new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) 
+            };
             if(roomsHistory.has(socket.room)) roomsHistory.get(socket.room).push({...d, ip: userIP});
             io.to(socket.room).emit("message", d);
         }
