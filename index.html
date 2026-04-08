@@ -16,7 +16,7 @@
         .btn-main { width: 100%; max-width: 300px; padding: 15px; font-size: 18px; background: var(--accent); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; opacity: 0.3; pointer-events: none; transition: 0.3s; }
         .btn-main.active { opacity: 1; pointer-events: auto; }
         #chat-area { flex: 1; overflow-y: auto; padding: 70px 15px 20px; display: flex; flex-direction: column; gap: 10px; }
-        .msg { max-width: 80%; padding: 10px 14px; border-radius: 18px; font-size: 15px; word-wrap: break-word; line-height: 1.4; cursor: pointer; }
+        .msg { max-width: 80%; padding: 10px 14px; border-radius: 18px; font-size: 15px; word-wrap: break-word; line-height: 1.4; cursor: pointer; position: relative; }
         .my-msg { align-self: flex-end; background: var(--my); border-bottom-right-radius: 4px; }
         .their-msg { align-self: flex-start; background: var(--their); border-bottom-left-radius: 4px; }
         .time { font-size: 10px; opacity: 0.5; display: block; margin-top: 4px; text-align: right; }
@@ -24,10 +24,6 @@
         #m { flex: 1; background: #3a3b3c; border: none; border-radius: 20px; padding: 12px 15px; color: white; outline: none; font-size: 16px; }
         .action-btn { background: none; border: none; font-size: 20px; cursor: pointer; display: flex; align-items: center; }
         #rules-box { background: #242526; padding: 15px; border-radius: 12px; font-size: 11px; text-align: left; border: 1px solid #444; width: 100%; max-width: 300px; color: #aaa; line-height: 1.5; }
-        .context-menu { position: fixed; background: #3a3b3c; border-radius: 12px; padding: 5px; display: flex; flex-direction: column; z-index: 1000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
-        .context-menu button { background: none; border: none; color: white; padding: 10px 20px; text-align: left; cursor: pointer; border-radius: 8px; font-size: 14px; }
-        .context-menu button:hover { background: #4e4f50; }
-        .context-menu .report-btn { color: #f35a5a; font-weight: bold; }
         .hidden { display: none !important; }
     </style>
 </head>
@@ -46,7 +42,7 @@
             <select id="searchGender" class="welcome-input"><option value="ALL">Всех</option><option value="M">Парней</option><option value="F">Девушек</option></select>
             <select id="searchAge" class="welcome-input"><option value="ALL">Любой возраст</option><option value="18-24">18-24</option><option value="24-35">24-35</option></select>
         </div>
-        <div id="rules-box">
+         <div id="rules-box">
             <b>ПРАВИЛА (18+):</b><br>
             1. Запрещена любая ненависть.<br>
             2. Запрещен мат.<br>
@@ -58,14 +54,14 @@
             8. Не давайте личные данные.<br>
             9. Бан по IP за нарушения.<br>
             10. Нажимая, вам есть 18 лет.
-        </div>
+         </div>
         <label style="font-size: 13px; color: #888; cursor:pointer;"><input type="checkbox" id="agree"> Принимаю правила</label>
         <button class="btn-main" id="startBtn">Найти собеседника</button>
         <p id="wait" class="hidden">Поиск...</p>
     </div>
     <div id="chat-area"></div>
     <div id="input-area" class="hidden">
-        <button class="action-btn" onclick="if(confirm('Сменить?')) socket.emit('endChat')" style="color:var(--danger)">⏭️</button>
+        <button class="action-btn" id="leaveBtn" style="color:var(--danger)">⏭️</button>
         <input type="text" id="m" placeholder="Текст..." autocomplete="off">
         <button id="sendBtn" class="action-btn" style="color:var(--my); font-weight:bold; font-size:14px;">ОТПРАВИТЬ</button>
     </div>
@@ -73,30 +69,73 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-    if (!localStorage.getItem('permanentId')) { localStorage.setItem('permanentId', 'id-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now().toString(36)); }
+    if (!localStorage.getItem('permanentId')) { 
+        localStorage.setItem('permanentId', 'id-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now().toString(36)); 
+    }
     const myId = localStorage.getItem('permanentId');
     const socket = io();
-    const chat = document.getElementById('chat-area'), input = document.getElementById('m'), startBtn = document.getElementById('startBtn'), nickInput = document.getElementById('nickInput');
     
-    const validate = () => { if(nickInput.value.trim().length >= 2 && document.getElementById('agree').checked) startBtn.classList.add('active'); else startBtn.classList.remove('active'); };
-    nickInput.oninput = validate; document.getElementById('agree').onchange = validate;
-    
-    startBtn.onclick = () => { socket.emit('startSearch', { permanentId: myId, nickname: nickInput.value.trim(), myGender: document.getElementById('myGender').value, myAge: document.getElementById('myAge').value, searchGender: document.getElementById('searchGender').value, searchAge: document.getElementById('searchAge').value }); startBtn.classList.add('hidden'); document.getElementById('wait').classList.remove('hidden'); };
-    
+    const chat = document.getElementById('chat-area'), 
+          input = document.getElementById('m'), 
+          startBtn = document.getElementById('startBtn'), 
+          nickInput = document.getElementById('nickInput'),
+          leaveBtn = document.getElementById('leaveBtn'),
+          sendBtn = document.getElementById('sendBtn');
+
+    const validate = () => { 
+        if(nickInput.value.trim().length >= 2 && document.getElementById('agree').checked) 
+            startBtn.classList.add('active'); 
+        else 
+            startBtn.classList.remove('active'); 
+    };
+
+    nickInput.oninput = validate; 
+    document.getElementById('agree').onchange = validate;
+
+    startBtn.onclick = () => { 
+        socket.emit('startSearch', { 
+            permanentId: myId, 
+            nickname: nickInput.value.trim(), 
+            myGender: document.getElementById('myGender').value, 
+            myAge: document.getElementById('myAge').value, 
+            searchGender: document.getElementById('searchGender').value, 
+            searchAge: document.getElementById('searchAge').value 
+        }); 
+        startBtn.classList.add('hidden'); 
+        document.getElementById('wait').classList.remove('hidden'); 
+    };
+
+    leaveBtn.onclick = () => {
+        if(confirm('Сменить собеседника?')) socket.emit('endChat');
+    };
+
+    const sendMessage = () => {
+        if(input.value.trim()) {
+            socket.emit('message', input.value);
+            input.value = '';
+        }
+    };
+
+    sendBtn.onclick = sendMessage;
+    input.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
+
     let tId;
     socket.on('chatStart', (d) => { 
         document.getElementById('welcome').classList.add('hidden'); 
         document.getElementById('input-area').classList.remove('hidden'); 
         document.getElementById('timer').classList.remove('hidden'); 
         chat.innerHTML = `<div style="text-align:center; color:#888; font-size:12px;">Вы с собеседником ${d.partnerNick}</div>`; 
-        let sec = 1800; clearInterval(tId); 
+        
+        let sec = 1800; 
+        clearInterval(tId); 
         tId = setInterval(() => { 
-            sec--; let m = Math.floor(sec/60), s = sec%60; 
+            sec--; 
+            let m = Math.floor(sec/60), s = sec%60; 
             document.getElementById('timer').innerText = `${m}:${s < 10 ? '0' : ''}${s}`; 
             if(sec <= 0) socket.emit('endChat'); 
         }, 1000); 
     });
-    
+
     socket.on('chatEnd', () => { 
         clearInterval(tId); 
         document.getElementById('timer').classList.add('hidden'); 
@@ -109,37 +148,34 @@
     const appendMsg = (d, type) => { 
         const div = document.createElement('div'); 
         div.className = `msg ${type}`; 
-        div.innerHTML = `<b>${d.nick}</b><br>${d.text}<span class="time">${d.time}</span>`; 
-        div.onclick = (e) => showMenu(e, d.nick); 
+        div.innerHTML = `<b>${d.nick}</b><br>${d.text}<span class="time">${d.time}</span>`;
+        
+        if (type === 'their-msg') {
+            div.onclick = () => {
+                if(confirm('Пожаловаться на это сообщение?')) {
+                    socket.emit('sendReport');
+                    alert('Жалоба отправлена');
+                }
+            };
+        }
+        
         chat.appendChild(div); 
         chat.scrollTop = chat.scrollHeight; 
     };
 
-    document.getElementById('sendBtn').onclick = () => { 
-        if(input.value.trim()){ 
-            socket.emit('message', input.value); 
-            input.value = ''; 
-        } 
-    };
+    socket.on('message', (d) => {
+        const type = d.id === myId ? 'my-msg' : 'their-msg';
+        appendMsg(d, type);
+    });
 
-    input.onkeypress = (e) => { if(e.key === 'Enter') document.getElementById('sendBtn').click(); };
+    socket.on('updateOnline', (count) => {
+        document.getElementById('count').innerText = count;
+    });
 
-    socket.on('message', (d) => appendMsg(d, d.id === myId ? 'my-msg' : 'their-msg'));
-    socket.on('updateOnline', (c) => document.getElementById('count').innerText = c);
-
-    function showMenu(e, nick) { 
-        const old = document.querySelector('.context-menu'); if(old) old.remove(); 
-        const m = document.createElement('div'); 
-        m.className = 'context-menu'; 
-        m.style.top = `${e.clientY}px`; 
-        m.style.left = `${e.clientX}px`; 
-        m.innerHTML = `<button onclick="reply('${nick}')">Ответить</button><button class="report-btn" onclick="rep()">Жалоба</button><button onclick="this.parentElement.remove()">Отмена</button>`; 
-        document.body.appendChild(m); 
-        setTimeout(() => { window.onclick = () => { if(m) m.remove(); window.onclick = null; } }, 100); 
-    }
-
-    window.reply = (n) => { input.value = `${n}, `; input.focus(); };
-    window.rep = () => { if(confirm('Отправить жалобу?')){ socket.emit('sendReport'); alert('Жалоба отправлена'); } };
+    socket.on('banned_user', () => {
+        alert('Вы были заблокированы.');
+        window.location.reload();
+    });
 </script>
 </body>
 </html>
