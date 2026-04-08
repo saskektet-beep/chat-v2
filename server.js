@@ -18,11 +18,9 @@ app.get('/admin', (req, res) => res.sendFile(path.join(publicPath, 'admin.html')
 let queue = [], reports = [], roomsHistory = new Map();
 const ADMIN_PASSWORD = "Cfifcfif"; 
 
-// Храним баны и по IP, и по ID
 let bannedIPs = new Set();
 let bannedIds = new Set();
 
-// Загрузка банов
 if (fs.existsSync("bans.json")) {
     try {
         const data = JSON.parse(fs.readFileSync("bans.json"));
@@ -38,40 +36,62 @@ const escapeHTML = (str) => {
     return str.replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 };
 
+// Функция завершения чата
+function terminateChat(socket, informPartner = true) {
+    if (socket.room) {
+        if (informPartner) {
+            socket.to(socket.room).emit("chatEnd");
+        }
+        socket.leave(socket.room);
+        roomsHistory.delete(socket.room);
+        socket.room = null;
+    }
+}
+
 io.on("connection", (socket) => {
     const userIP = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
 
-    // Сразу проверяем IP
     if (bannedIPs.has(userIP)) { socket.emit("banned_user"); socket.disconnect(true); return; }
     
     io.emit("updateOnline", io.engine.clientsCount);
 
-    socket.on("startSearch", (data) => {
-        // Проверяем ID устройства при попытке начать поиск
-        if (bannedIds.has(data.permanentId)) {
-            socket.emit("banned_user");
-            socket.disconnect(true);
+    // Универсальная логика поиска
+    const startSearchLogic = (s) => {
+        if (bannedIds.has(s.permanentId)) {
+            s.emit("banned_user");
+            s.disconnect(true);
             return;
         }
 
-        if (socket.room) { io.to(socket.room).emit("chatEnd"); roomsHistory.delete(socket.room); socket.room = null; }
-        queue = queue.filter(s => s.id !== socket.id);
-        
-        socket.permanentId = data.permanentId || "unknown";
-        socket.username = escapeHTML(data.nickname) || "Аноним";
-        
-        const pIndex = queue.findIndex(p => p.id !== socket.id);
+        queue = queue.filter(q => q.id !== s.id);
+        const pIndex = queue.findIndex(p => p.id !== s.id);
+
         if (pIndex !== -1) {
             const partner = queue.splice(pIndex, 1)[0];
-            const room = `room_${socket.id}_${partner.id}`;
-            socket.join(room); partner.join(room);
-            socket.room = room; partner.room = room;
+            const room = `room_${s.id}_${partner.id}`;
+            s.join(room); partner.join(room);
+            s.room = room; partner.room = room;
             roomsHistory.set(room, []);
-            socket.emit("chatStart", { partnerNick: partner.username });
-            partner.emit("chatStart", { partnerNick: socket.username });
+            s.emit("chatStart", { partnerNick: partner.username });
+            partner.emit("chatStart", { partnerNick: s.username });
         } else {
-            queue.push(socket);
-            socket.emit("waiting");
+            queue.push(s);
+            s.emit("waiting");
+        }
+    };
+
+    socket.on("startSearch", (data) => {
+        terminateChat(socket, true);
+        socket.permanentId = data.permanentId || "unknown";
+        socket.username = escapeHTML(data.nickname) || "Аноним";
+        startSearchLogic(socket);
+    });
+
+    socket.on("endChat", () => {
+        const wasInChat = !!socket.room;
+        terminateChat(socket, true);
+        if (wasInChat) {
+            startSearchLogic(socket); // Сразу ищем нового после нажатия "Следующий"
         }
     });
 
@@ -85,12 +105,11 @@ io.on("connection", (socket) => {
 
     socket.on("sendReport", () => {
         if (socket.room && roomsHistory.has(socket.room)) {
-            // В жалобу теперь попадает и IP, и ID того, на кого жалуются
             reports.push({ 
                 id: Date.now(), 
                 reporterNick: socket.username, 
                 targetIP: userIP, 
-                targetId: socket.permanentId, // Это ID того, кто отправил отчет (в реальном чате нужно брать ID оппонента)
+                targetId: socket.permanentId, 
                 time: new Date().toLocaleString(), 
                 chatLog: JSON.parse(JSON.stringify(roomsHistory.get(socket.room))) 
             });
@@ -100,12 +119,22 @@ io.on("connection", (socket) => {
 
     socket.on("admin_login", (p) => { if(p === ADMIN_PASSWORD) { socket.isAdmin = true; socket.emit("admin_access", { reports, bannedIps: [...bannedIPs], bannedIds: [...bannedIds] }); } });
     
-    // БАН ПО ID УСТРОЙСТВА
     socket.on("admin_ban_id", (targetId) => {
         if (!socket.isAdmin) return;
         bannedIds.add(targetId);
         saveBans();
         io.sockets.sockets.forEach(s => { if(s.permanentId === targetId) { s.emit("banned_user"); s.disconnect(true); }});
+        io.emit("admin_update", { reports, bannedIps: [...bannedIPs], bannedIds: [...bannedIds] });
+    });
+
+    socket.on("admin_ban_target", (ip) => {
+        if (!socket.isAdmin) return;
+        bannedIPs.add(ip);
+        saveBans();
+        io.sockets.sockets.forEach(s => { 
+            const sIP = s.handshake.headers['x-forwarded-for'] || s.handshake.address;
+            if(sIP === ip){ s.emit("banned_user"); s.disconnect(true); }
+        });
         io.emit("admin_update", { reports, bannedIps: [...bannedIPs], bannedIds: [...bannedIds] });
     });
 
@@ -115,13 +144,23 @@ io.on("connection", (socket) => {
         io.emit("admin_update", { reports, bannedIps: [...bannedIPs], bannedIds: [...bannedIds] });
     });
 
+    socket.on("admin_unban", (ip) => {
+        if (!socket.isAdmin) return;
+        bannedIPs.delete(ip); saveBans();
+        io.emit("admin_update", { reports, bannedIps: [...bannedIPs], bannedIds: [...bannedIds] });
+    });
+
     socket.on("admin_close_report", (id) => {
         if (!socket.isAdmin) return;
         reports = reports.filter(r => r.id !== id);
         io.emit("admin_update", { reports, bannedIps: [...bannedIPs], bannedIds: [...bannedIds] });
     });
 
-    socket.on("disconnect", () => { queue = queue.filter(u => u.id !== socket.id); io.emit("updateOnline", io.engine.clientsCount); });
+    socket.on("disconnect", () => { 
+        terminateChat(socket, true);
+        queue = queue.filter(u => u.id !== socket.id); 
+        io.emit("updateOnline", io.engine.clientsCount); 
+    });
 });
 
 server.listen(PORT, () => console.log(`Сервер: ${PORT}`));
