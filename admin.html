@@ -2,65 +2,87 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Panel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | AnonChat</title>
     <style>
-        body { background: #121212; color: #fff; font-family: sans-serif; padding: 20px; }
-        .section { background: #1c1c1c; padding: 20px; border-radius: 15px; border: 1px solid #333; margin-bottom: 20px; }
-        .chat-log { background: #000; padding: 10px; border-radius: 10px; display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
-        .bubble { padding: 8px; border-radius: 8px; font-size: 13px; max-width: 90%; }
-        .rep { background: #0084ff; align-self: flex-end; }
-        .tar { background: #3a3b3c; align-self: flex-start; }
-        button { border: none; border-radius: 5px; padding: 8px 15px; cursor: pointer; font-weight: bold; }
-        .ban-btn { background: #ff4d4d; color: white; font-size: 10px; margin-left: 10px; }
-        input { padding: 10px; background: #222; border: 1px solid #444; color: #fff; border-radius: 5px; }
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --accent: #38bdf8;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+        }
+        * { box-sizing: border-box; transition: all 0.2s ease; }
+        body { background: var(--bg); color: var(--text-main); font-family: sans-serif; margin: 0; display: flex; min-height: 100vh; }
+        #auth { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; }
+        .auth-card { background: var(--card-bg); padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; }
+        #content { display: none; width: 100%; max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+        .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+        .section { background: var(--card-bg); border-radius: 20px; padding: 25px; border: 1px solid #334155; }
+        .report-card { background: #0f172a; border-radius: 15px; padding: 15px; margin-bottom: 20px; border-left: 4px solid var(--danger); }
+        .chat-log { background: #020617; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 10px; max-height: 350px; overflow-y: auto; }
+        .bubble { padding: 10px 14px; border-radius: 12px; font-size: 0.9rem; position: relative; max-width: 85%; color: white; }
+        .rep { background: #1e3a8a; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .tar { background: #334155; align-self: flex-start; border-bottom-left-radius: 2px; }
+        button { padding: 10px 20px; border-radius: 10px; border: none; cursor: pointer; font-weight: bold; }
+        .btn-primary { background: var(--accent); color: #000; }
+        .btn-danger { background: var(--danger); color: white; padding: 5px 10px; font-size: 0.7rem; }
+        .btn-close { background: #334155; color: white; width: 100%; margin-top: 10px; }
+        input { padding: 12px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 10px; margin-bottom: 20px; }
+        .ban-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #0f172a; border-radius: 10px; margin-bottom: 8px; }
     </style>
 </head>
 <body>
-    <div id="auth" style="text-align:center; margin-top:50px;">
-        <h2>Вход Администратора</h2>
-        <input type="password" id="pass" placeholder="Пароль">
-        <button onclick="socket.emit('admin_login', document.getElementById('pass').value)" style="background:#2ecc71">Войти</button>
-    </div>
-    <div id="content" style="display:none">
-        <div class="section">
-            <h2>Жалобы (с аудио)</h2>
-            <div id="reports"></div>
+    <div id="auth">
+        <div class="auth-card">
+            <h1>🛡️ Admin Login</h1>
+            <input type="password" id="pass" placeholder="Пароль"> <br>
+            <button class="btn-primary" onclick="login()">Войти</button>
         </div>
-        <div class="section">
-            <h2>Черный список IP</h2>
-            <div id="banned"></div>
+    </div>
+    <div id="content">
+        <div class="grid">
+            <div class="section">
+                <h2>🚨 Жалобы: <span id="repCount">0</span></h2>
+                <div id="reports"></div>
+            </div>
+            <div class="section">
+                <h2>🚫 Бан-лист</h2>
+                <div id="banned"></div>
+            </div>
         </div>
     </div>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
+        function login() { socket.emit('admin_login', document.getElementById('pass').value); }
         socket.on('admin_access', d => { document.getElementById('auth').style.display='none'; document.getElementById('content').style.display='block'; render(d); });
         socket.on('admin_update', d => render(d));
-
         function render(data) {
             const rDiv = document.getElementById('reports'), bDiv = document.getElementById('banned');
+            document.getElementById('repCount').innerText = data.reports.length;
             rDiv.innerHTML = ''; bDiv.innerHTML = '';
-
             data.reports.forEach(r => {
-                let logs = r.chatLog.map(m => {
-                    let content = m.audio 
-                        ? `<audio src="${m.audio}" controls style="width:180px;height:30px;filter:invert(1)"></audio>` 
-                        : `<span>${m.text}</span>`;
-                    return `<div class="bubble ${m.nick === r.reporterNick ? 'rep' : 'tar'}" style="margin-bottom:5px;">
-                        <small><b>${m.nick}</b> [${m.ip}]</small> <button class="ban-btn" onclick="socket.emit('admin_ban_target', '${m.ip}')">BAN IP</button><br>${content}
-                    </div>`;
-                }).join('');
-
-                rDiv.innerHTML += `<div class="card" style="border-bottom:1px solid #444; padding:10px 0;">
-                    <small>От: ${r.reporterNick} | ${r.time}</small>
+                let logs = r.chatLog.map(m => `
+                    <div class="bubble ${m.id === r.reporterId ? 'rep' : 'tar'}">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; gap:10px;">
+                            <b>${m.nick}</b>
+                            <button class="btn-danger" onclick="socket.emit('admin_ban_target', '${m.ip}')">BAN</button>
+                        </div>
+                        <div>${m.text}</div>
+                        <div style="font-size: 10px; opacity: 0.4; margin-top: 5px; text-align: right;">${m.time} | IP: ${m.ip}</div>
+                    </div>`).join('');
+                rDiv.innerHTML += `
+                <div class="report-card">
+                    <div style="color:var(--text-dim); font-size:0.8rem; margin-bottom:10px;">От: ${r.reporterNick} | ${r.time}</div>
                     <div class="chat-log">${logs}</div>
-                    <button style="width:100%; margin-top:5px; background:#444; color:#fff" onclick="socket.emit('admin_close_report', ${r.id})">Закрыть жалобу</button>
+                    <button class="btn-close" onclick="socket.emit('admin_close_report', ${r.id})">Удалить жалобу</button>
                 </div>`;
             });
-
-            data.banned.forEach(ip => { 
-                bDiv.innerHTML += `<div style="padding:10px; background:#222; margin-bottom:5px; display:flex; justify-content:space-between;">${ip} <button onclick="socket.emit('admin_unban', '${ip}')" style="background:#2ecc71; color:white; padding:2px 10px;">РАЗБАН</button></div>`; 
-            });
+            data.banned.forEach(ip => { bDiv.innerHTML += `<div class="ban-item"><span>📍 ${ip}</span><button class="btn-danger" onclick="socket.emit('admin_unban', '${ip}')">Разбан</button></div>`; });
         }
     </script>
 </body>
